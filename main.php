@@ -201,8 +201,7 @@ $i=$textint;
 		if (strip_tags($parsed_json->{'features'}[$i]->{'properties'}->{'attrezzature_lingue'}) !=null) $homepage .= "Lingue: ".strip_tags($parsed_json->{'features'}[$i]->{'properties'}->{'attrezzature_lingue'})."\n";
 		if (strip_tags($parsed_json->{'features'}[$i]->{'properties'}->{'camere'}) !=null) $homepage .= "Camere: ".strip_tags($parsed_json->{'features'}[$i]->{'properties'}->{'camere'})."\n";
 
-
-		if($parsed_json->{'features'}[$i]->{'geometry'}->{'coordinates'}[0] !=NULL){
+	if(strpos($parsed_json->{'features'}[$i]->{'geometry'}->{'coordinates'}[0],'.') !== false){
 		$homepagemappa .= "http://www.openstreetmap.org/?mlat=".$parsed_json->{'features'}[$i]->{'geometry'}->{'coordinates'}[1]."&mlon=".$parsed_json->{'features'}[$i]->{'geometry'}->{'coordinates'}[0]."#map=19/".$parsed_json->{'features'}[$i]->{'geometry'}->{'coordinates'}[1]."/".$parsed_json->{'features'}[$i]->{'geometry'}->{'coordinates'}[0];
 
 		$option = array( array( $telegram->buildInlineKeyboardButton("MAPPA", $url=$homepagemappa)));
@@ -248,141 +247,158 @@ if ($ciclo==0){
 	 }
 
 
+	 function location_manager($telegram,$user_id,$chat_id,$location)
+	 	{
 
-function location_manager($telegram,$user_id,$chat_id,$location)
-	{
+	 		function extractString($string, $start, $end) {
+	 				$string = " ".$string;
+	 				$ini = strpos($string, $start);
+	 				if ($ini == 0) return "";
+	 				$ini += strlen($start);
+	 				$len = strpos($string, $end, $ini) - $ini;
+	 				return substr($string, $ini, $len);
+	 		}
 
-			$lon=$location["longitude"];
-			$lat=$location["latitude"];
-			$r=1;
-			$response=$telegram->getData();
-			$response=str_replace(" ","%20",$response);
+	 			$lon=$location["longitude"];
+	 			$lat=$location["latitude"];
+	 			$r=1;
+	 			$response=$telegram->getData();
+	 			$response=str_replace(" ","%20",$response);
 
-				$reply="http://nominatim.openstreetmap.org/reverse?email=piersoft2@gmail.com&format=json&lat=".$lat."&lon=".$lon."&zoom=18&addressdetails=1";
-				$json_string = file_get_contents($reply);
-				$parsed_json = json_decode($json_string);
-				//var_dump($parsed_json);
-				$comune="";
-				$temp_c1 =$parsed_json->{'display_name'};
+	 				$reply="http://nominatim.openstreetmap.org/reverse?email=piersoft2@gmail.com&format=json&lat=".$lat."&lon=".$lon."&zoom=18&addressdetails=1";
+	 				$json_string = file_get_contents($reply);
+	 				$parsed_json = json_decode($json_string);
+	 				//var_dump($parsed_json);
+	 				$comune="";
+	 				$temp_c1 =$parsed_json->{'display_name'};
 
-				if ($parsed_json->{'address'}->{'town'}) {
-					$temp_c1 .="\nCittà: ".$parsed_json->{'address'}->{'town'};
-					$comune .=$parsed_json->{'address'}->{'town'};
-				}else 	$comune .=$parsed_json->{'address'}->{'city'};
+	 				if ($parsed_json->{'address'}->{'town'}) {
+	 					$temp_c1 .="\nCittà: ".$parsed_json->{'address'}->{'town'};
+	 					$comune .=$parsed_json->{'address'}->{'town'};
+	 				}else 	$comune .=$parsed_json->{'address'}->{'city'};
 
-				if ($parsed_json->{'address'}->{'village'}) $comune .=$parsed_json->{'address'}->{'village'};
-				$location="Sto cercando le strutture ricettive a \"".ucfirst($comune)."\" ";
-				// tramite le coordinate che hai inviato: ".$lat.",".$lon;
-				$content = array('chat_id' => $chat_id, 'text' => $location,'disable_web_page_preview'=>true);
-				$telegram->sendMessage($content);
+	 				if ($parsed_json->{'address'}->{'village'}) $comune .=$parsed_json->{'address'}->{'village'};
+	 				$location="Sto cercando le strutture ricettive a \"".ucfirst($comune)."\" ";
+	 				// tramite le coordinate che hai inviato: ".$lat.",".$lon;
+	 				$content = array('chat_id' => $chat_id, 'text' => $location,'disable_web_page_preview'=>true);
+	 				$telegram->sendMessage($content);
 
-			  $alert="";
-				$homepage="";
-	$json_string=file_get_contents("/usr/www/piersoft/dovedormirenellemarchebot/db/ricettive.json");
+	 			  $alert="";
+	 				$homepage="";
+	 	$json_string=file_get_contents("/usr/www/piersoft/dovedormirenellemarchebot/db/ricettive.json");
 
-				$parsed_json = json_decode($json_string);
+	 				$parsed_json = json_decode($json_string);
+	 				$comune="!".$comune;
+	 				$comune2=extractString($comune,"!","/");
+	 				$comune=str_replace($comune2,"",$comune);
+	 				$comune=str_replace("!","",$comune);
+	 				$comune=str_replace("/","",$comune);
+	 	$ciclo=0;
 
-	$ciclo=0;
-
-			$result=0;
-$csv=[];
-			$ciclo=0;
-//if ($count >40) $count=40;
-foreach ($parsed_json->{'features'} as $i => $value) {
-	$filter=$parsed_json->{'features'}[$i]->{'attributes'}->{'nome_comune'};
-
-
-if (strpos(strtoupper($filter),strtoupper($comune)) !== false ){
-$ciclo++;
-		$lat10=floatval($parsed_json->{'features'}[$i]->{'geometry'}->{'coordinates'}[0]);
-		$long10=floatval($parsed_json->{'features'}[$i]->{'geometry'}->{'coordinates'}[1]);
-		$theta = floatval($lon)-floatval($long10);
-		$dist =floatval( sin(deg2rad($lat)) * sin(deg2rad($lat10)) +  cos(deg2rad($lat)) * cos(deg2rad($lat10)) * cos(deg2rad($theta)));
-		$dist = floatval(acos($dist));
-		$dist = floatval(rad2deg($dist));
-		$miles = floatval($dist * 60 * 1.1515 * 1.609344);
-	//echo $miles;
-
-		if ($miles >=1){
-			$data1 =number_format($miles, 2, '.', '');
-			$data =number_format($miles, 2, '.', '')." Km";
-		} else {
-			$data =number_format(($miles*1000), 0, '.', '')." mt";
-			$data1 =number_format(($miles*1000), 0, '.', '');
-		}
-		$csv[$i][100]= array("distance" => "value");
-
-		$csv[$i][100]= $data;
-		$csv[$i][101]= array("AccomDesc" => "value");
-
-		$csv[$i][101]= $parsed_json->{'features'}[$i]->{'attributes'}->{'denominazione_struttura'};
-
-		$csv[$i][102]= array("Tipology" => "value");
-
-		$csv[$i][102]= $parsed_json->{'features'}[$i]->{'attributes'}->{'classificazione'};
-
-		$csv[$i][103]= array("ESRI_OID" => "value");
-
-		$csv[$i][103]= $parsed_json->{'features'}[$i]->{'attributes'}->{'id_struttura'};
-
-		$csv[$i][104]= array("lon" => "value");
-
-		$csv[$i][104]= $parsed_json->{'features'}[$i]->{'geometry'}->{'coordinates'}[0];
-		$csv[$i][105]= array("lat" => "value");
-
-		$csv[$i][105]= $parsed_json->{'features'}[$i]->{'geometry'}->{'coordinates'}[1];
-
-}
-}
-
-sort($csv);
-
-$ciclo2=0;
-foreach ($csv as $i => $value) {
-
-$ciclo2++;
-		$homepage = "Nome: <b>".$csv[$i][101]."</b>\n";
-		$homepage .= "Tipologia: <b>".$csv[$i][102]."</b>\n";
-		$homepage .= "Clicca per dettagli: /".$csv[$i][103]."\n";
-		$homepage .="Dista: ".$csv[$i][100]."\n";
-		//	$homepage .= "http://www.openstreetmap.org/?mlat=".$csv[$i][12]."&mlon=".$csv[$i][13]."#map=19/".$csv[$i][12]."/".$csv[$i][13];
-		$location2 ="http://map.project-osrm.org/?z=14&center=40.351025%2C18.184133&loc=".$lat."%2C".$lon."&loc=".$csv[$i][104]."%2C".$csv[$i][105]."&hl=en&ly=&alt=&df=&srv=";
-		$homepage .="<a href='".$location2."'>Portami QUI</a>";
+	 			$result=0;
+	 $csv=[];
+	 			$ciclo=0;
+	 //if ($count >40) $count=40;
+	 foreach ($parsed_json->{'features'} as $i => $value) {
+	 	$filter=$parsed_json->{'features'}[$i]->{'properties'}->{'nome_comune'};
 
 
-		$homepage .="\n____________";
-		$chunks = str_split($homepage, self::MAX_LENGTH);
-		foreach($chunks as $chunk) {
-		$content = array('chat_id' => $chat_id, 'text' => $chunk,'disable_web_page_preview'=>true,'parse_mode'=>"HTML");
-		$telegram->sendMessage($content);
+	 if (stristr($filter,$comune) !== false ){
+		 if (stristr($parsed_json->{'features'}[$i]->{'geometry'}->{'coordinates'}[1],'.'	) !== false){
+	 $ciclo++;
+	 		$lat10=floatval($parsed_json->{'features'}[$i]->{'geometry'}->{'coordinates'}[1]);
+	 		$long10=floatval($parsed_json->{'features'}[$i]->{'geometry'}->{'coordinates'}[0]);
+	 		$theta = floatval($lon)-floatval($long10);
+	 		$dist =floatval( sin(deg2rad($lat)) * sin(deg2rad($lat10)) +  cos(deg2rad($lat)) * cos(deg2rad($lat10)) * cos(deg2rad($theta)));
+	 		$dist = floatval(acos($dist));
+	 		$dist = floatval(rad2deg($dist));
+	 		$miles = floatval($dist * 60 * 1.1515 * 1.609344);
+	 	//echo $miles;
 
-		}
-		if ($ciclo2>=30){
-			$location="Ti ho mostrato le prime 30 distanti in maniera crescente dalla tua posizione.";
-			$content = array('chat_id' => $chat_id, 'text' => $location,'disable_web_page_preview'=>true,'parse_mode'=>"HTML");
-			$telegram->sendMessage($content);
-		$this->create_keyboard_temp($telegram,$chat_id);
-			exit;
-		}
+	 		if ($miles >=1){
+	 			$data1 =number_format($miles, 2, '.', '');
+	 			$data =number_format($miles, 2, '.', '')." Km";
+	 		} else {
+	 			$data =number_format(($miles*1000), 0, '.', '')." mt";
+	 			$data1 =number_format(($miles*1000), 0, '.', '');
+	 		}
+	 		$csv[$i][100]= array("distance" => "value");
 
-						}
+	 		$csv[$i][100]= $data;
+	 		$csv[$i][101]= array("AccomDesc" => "value");
+
+	 		$csv[$i][101]= $parsed_json->{'features'}[$i]->{'properties'}->{'denominazione_struttura'};
+
+	 		$csv[$i][102]= array("Tipology" => "value");
+
+	 		$csv[$i][102]= $parsed_json->{'features'}[$i]->{'properties'}->{'classificazione'};
+
+	 		$csv[$i][103]= array("ESRI_OID" => "value");
+
+	 		$csv[$i][103]= $parsed_json->{'features'}[$i]->{'properties'}->{'id_struttura'};
+
+	 		$csv[$i][104]= array("lon" => "value");
+
+	 		$csv[$i][104]= $parsed_json->{'features'}[$i]->{'geometry'}->{'coordinates'}[1];
+	 		$csv[$i][105]= array("lat" => "value");
+
+	 		$csv[$i][105]= $parsed_json->{'features'}[$i]->{'geometry'}->{'coordinates'}[0];
+	 		$csv[$i][106]= array("id" => "value");
+
+	 		$csv[$i][106]= $i;
+
+	 }
+	 }
+	 }
+
+	 sort($csv);
+
+	 $ciclo2=0;
+	 foreach ($csv as $i => $value) {
+
+	 $ciclo2++;
+	 		$homepage .= "Nome: <b>".$csv[$i][101]."</b>\n";
+	 		$homepage .= "Tipologia: <b>".$csv[$i][102]."</b>\n";
+	 		$homepage .= "Clicca per dettagli: /".$csv[$i][106]."\n";
+	 		$homepage .="Dista: ".$csv[$i][100]."\n";
+	 		//	$homepage .= "http://www.openstreetmap.org/?mlat=".$csv[$i][12]."&mlon=".$csv[$i][13]."#map=19/".$csv[$i][12]."/".$csv[$i][13];
+	 		$location2 ="http://map.project-osrm.org/?z=14&center=40.351025%2C18.184133&loc=".$lat."%2C".$lon."&loc=".$csv[$i][104]."%2C".$csv[$i][105]."&hl=en&ly=&alt=&df=&srv=";
+	 		$homepage .="<a href='".$location2."'>Portami QUI</a>";
+
+
+	 		$homepage .="\n____________\n";
+	 		$chunks = str_split($homepage, self::MAX_LENGTH);
+	 		foreach($chunks as $chunk) {
+	 		$content = array('chat_id' => $chat_id, 'text' => $chunk,'disable_web_page_preview'=>true,'parse_mode'=>"HTML");
+	 		$telegram->sendMessage($content);
+
+	 		}
+	 		if ($ciclo2>=30){
+	 			$location="Ti ho mostrato le prime 30 distanti in maniera crescente dalla tua posizione.";
+	 			$content = array('chat_id' => $chat_id, 'text' => $location,'disable_web_page_preview'=>true,'parse_mode'=>"HTML");
+	 			$telegram->sendMessage($content);
+	 		$this->create_keyboard_temp($telegram,$chat_id);
+	 			exit;
+	 		}
+
+	 						}
 
 
 
-						if ($ciclo2==0){
-							$location="Nessuna struttura trovata";
-							$content = array('chat_id' => $chat_id, 'text' => $location,'disable_web_page_preview'=>true);
-							$telegram->sendMessage($content);
-						}
+	 						if ($ciclo2==0){
+	 							$location="Nessuna struttura trovata";
+	 							$content = array('chat_id' => $chat_id, 'text' => $location,'disable_web_page_preview'=>true);
+	 							$telegram->sendMessage($content);
+	 						}
 
-				$log=$today. ",".$comune."," .$chat_id. "\n";
-				file_put_contents('/usr/www/piersoft/dovedormirenellemarchebot/db/telegram.log', $log, FILE_APPEND | LOCK_EX);
+	 				$log=$today. ",".$comune."," .$chat_id. "\n";
+	 				file_put_contents('/usr/www/piersoft/dovedormireinsardegnabot/db/telegram.log', $log, FILE_APPEND | LOCK_EX);
 
-					$this->create_keyboard_temp($telegram,$chat_id);
-					exit;
-	}
+	 					$this->create_keyboard_temp($telegram,$chat_id);
+	 					exit;
+	 	}
 
 
-}
+	 }
 
-?>
+	 ?>
